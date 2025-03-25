@@ -70,16 +70,9 @@ This repository contains the infrastructure and configuration for a comprehensiv
    terraform apply
    ```
 
-4. Set up sensitive variables:
-
+4. Run Ansible playbook:
    ```bash
    cd monitoring_stack
-   cp group_vars/all.yml.template group_vars/all.yml
-   # Edit group_vars/all.yml with your sensitive data
-   ```
-
-5. Run Ansible playbook:
-   ```bash
    ansible-playbook playbook.yml
    ```
 
@@ -94,8 +87,6 @@ This repository contains the infrastructure and configuration for a comprehensiv
 - `ssh_public_key`: SSH public key for VM access
 
 ### Ansible Variables
-
-The following sensitive variables should be configured in `monitoring_stack/group_vars/all.yml`:
 
 - `slack_webhook_url`: Slack webhook URL for alerts
 - `github_token`: GitHub token for DORA metrics

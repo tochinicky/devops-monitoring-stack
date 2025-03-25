@@ -17,3 +17,9 @@
   ansible.builtin.systemd:
     name: blackbox-exporter
     state: restarted
+
+- name: restart nginx
+  become: true
+  service:
+    name: nginx
+    state: restarted

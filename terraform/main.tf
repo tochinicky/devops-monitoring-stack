@@ -42,96 +42,109 @@ resource "azurerm_network_security_group" "monitoring" {
   location            = var.location
   resource_group_name = var.resource_group_name
 
-  # SSH
+
   security_rule {
-    name                       = "SSH"
+    name                       = "HTTP"
     priority                   = 1001
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
-    destination_port_range     = "22"
+    destination_port_range     = "80"
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
 
-  # Prometheus
   security_rule {
-    name                       = "Prometheus"
+    name                       = "HTTPS"
     priority                   = 1002
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
-    destination_port_range     = "9090"
+    destination_port_range     = "443"
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
 
-  # Grafana
-  security_rule {
-    name                       = "Grafana"
-    priority                   = 1003
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "3000"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
-  }
 
-  # Node Exporter
-  security_rule {
-    name                       = "NodeExporter"
-    priority                   = 1004
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "9100"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
-  }
+  # # Prometheus
+  # security_rule {
+  #   name                       = "Prometheus"
+  #   priority                   = 1002
+  #   direction                  = "Inbound"
+  #   access                     = "Allow"
+  #   protocol                   = "Tcp"
+  #   source_port_range          = "*"
+  #   destination_port_range     = "9090"
+  #   source_address_prefix      = "*"
+  #   destination_address_prefix = "*"
+  # }
 
-  # Blackbox Exporter
-  security_rule {
-    name                       = "BlackboxExporter"
-    priority                   = 1005
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "9115"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
-  }
+  # # Grafana
+  # security_rule {
+  #   name                       = "Grafana"
+  #   priority                   = 1003
+  #   direction                  = "Inbound"
+  #   access                     = "Allow"
+  #   protocol                   = "Tcp"
+  #   source_port_range          = "*"
+  #   destination_port_range     = "3000"
+  #   source_address_prefix      = "*"
+  #   destination_address_prefix = "*"
+  # }
 
-  # Alertmanager
-  security_rule {
-    name                       = "Alertmanager"
-    priority                   = 1006
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "9093"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
-  }
+  # # Node Exporter
+  # security_rule {
+  #   name                       = "NodeExporter"
+  #   priority                   = 1004
+  #   direction                  = "Inbound"
+  #   access                     = "Allow"
+  #   protocol                   = "Tcp"
+  #   source_port_range          = "*"
+  #   destination_port_range     = "9100"
+  #   source_address_prefix      = "*"
+  #   destination_address_prefix = "*"
+  # }
 
-  # Test App
-  security_rule {
-    name                       = "NodeApp"
-    priority                   = 1007
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "3001"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
-  }
+  # # Blackbox Exporter
+  # security_rule {
+  #   name                       = "BlackboxExporter"
+  #   priority                   = 1005
+  #   direction                  = "Inbound"
+  #   access                     = "Allow"
+  #   protocol                   = "Tcp"
+  #   source_port_range          = "*"
+  #   destination_port_range     = "9115"
+  #   source_address_prefix      = "*"
+  #   destination_address_prefix = "*"
+  # }
+
+  # # Alertmanager
+  # security_rule {
+  #   name                       = "Alertmanager"
+  #   priority                   = 1006
+  #   direction                  = "Inbound"
+  #   access                     = "Allow"
+  #   protocol                   = "Tcp"
+  #   source_port_range          = "*"
+  #   destination_port_range     = "9093"
+  #   source_address_prefix      = "*"
+  #   destination_address_prefix = "*"
+  # }
+
+  # # Test App
+  # security_rule {
+  #   name                       = "NodeApp"
+  #   priority                   = 1007
+  #   direction                  = "Inbound"
+  #   access                     = "Allow"
+  #   protocol                   = "Tcp"
+  #   source_port_range          = "*"
+  #   destination_port_range     = "3001"
+  #   source_address_prefix      = "*"
+  #   destination_address_prefix = "*"
+  # }
 }
 
 resource "azurerm_network_interface" "monitoring" {
@@ -157,7 +170,7 @@ resource "azurerm_linux_virtual_machine" "monitoring" {
   resource_group_name             = var.resource_group_name
   location                        = var.location
   size                            = "Standard_D2s_v3"
-  admin_username                  = "azureuser"
+  admin_username                  = var.admin_username
   admin_password                  = var.admin_password
   disable_password_authentication = false
 

@@ -43,11 +43,11 @@ variable "vm_size" {
 variable "admin_username" {
   description = "The admin username for the virtual machine"
   type        = string
-  default     = "adminuser"
+  sensitive   = true
 }
 
 variable "admin_password" {
   description = "The admin password for the virtual machine"
   type        = string
-  default     = "SecurePassword123!"
+  sensitive   = true
 }

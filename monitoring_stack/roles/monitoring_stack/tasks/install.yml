@@ -114,13 +114,18 @@
 
 - name: Deploy DORA metrics exporter
   block:
+    - name: Remove existing DORA directory if exists
+      ansible.builtin.file:
+        path: /opt/dora-exporter
+        state: absent
+
     - name: Clone DORA repo
       ansible.builtin.git:
         repo: "{{ dora_repo }}"
         dest: /opt/dora-exporter
         version: main
         force: yes
-      
+        accept_hostkey: yes
 
     - name: Set directory permissions
       ansible.builtin.file:
@@ -130,11 +135,44 @@
         recurse: yes
         mode: 0755
 
-    - name: Configure Git safe directory
-      become: true
-      ansible.builtin.command:
-        cmd: "git config --global --add safe.directory /opt/dora-exporter"
+    - name: Create dora user home directory
+      ansible.builtin.file:
+        path: /home/dora
+        state: directory
+        owner: dora
+        group: dora
+        mode: 0750
 
+    - name: Install python3.12-venv package
+      ansible.builtin.apt:
+        name: python3.12-venv
+        state: present
+        update_cache: yes
+
+    - name: Create virtual environment
+      ansible.builtin.command:
+        cmd: "python3 -m venv /opt/dora-exporter/venv"
+        creates: /opt/dora-exporter/venv
+      become_user: dora
+      environment:
+        HOME: /home/dora
+
+    - name: Set venv permissions
+      ansible.builtin.file:
+        path: /opt/dora-exporter/venv
+        owner: dora
+        group: dora
+        mode: 0750
+        recurse: yes
+
+    - name: Install Python requirements
+      ansible.builtin.pip:
+        requirements: /opt/dora-exporter/requirements.txt
+        virtualenv: /opt/dora-exporter/venv
+        state: present
+      become_user: dora
+      environment:
+        HOME: /home/dora
 
     - name: Configure DORA environment
       ansible.builtin.template:
@@ -143,50 +181,6 @@
         owner: dora
         group: dora
         mode: 0640
-
-    - name: Install Python dependencies
-      become: true
-      command: |
-        sudo -u dora /opt/dora-exporter/venv/bin/pip install -r /opt/dora-exporter/requirements.txt
-      args:
-        creates: /opt/dora-exporter/venv/lib/python3.11/site-packages/requests  # Example package
-
-# - name: Create virtual environment
-#   ansible.builtin.command:
-#     cmd: "python3 -m venv --system-site-packages /opt/dora-exporter/venv"
-#     creates: /opt/dora-exporter/venv
-#   become_user: dora
-- name: Create dora user home directory
-  ansible.builtin.file:
-    path: /home/dora
-    state: directory
-    owner: dora
-    group: dora
-    mode: 0750
-
-- name: Create virtual environment
-  ansible.builtin.command:
-    cmd: "python3 -m venv /opt/dora-exporter/venv"
-    creates: /opt/dora-exporter/venv
-  become_user: dora
-  vars:
-    ansible_remote_tmp: /home/dora/.ansible-tmp
-    ansible_become_flags: "--tmpdir /home/dora/.ansible-tmp"
-
-- name: Set venv permissions
-  ansible.builtin.file:
-    path: /opt/dora-exporter/venv
-    owner: dora
-    group: dora
-    mode: 0750
-    recurse: yes
-    
-- name: Install Python requirements
-  ansible.builtin.pip:
-    requirements: /opt/dora-exporter/requirements.txt
-    virtualenv: /opt/dora-exporter/venv
-    state: present
-  become_user: dora
 
 - name: Install Grafana
   block:

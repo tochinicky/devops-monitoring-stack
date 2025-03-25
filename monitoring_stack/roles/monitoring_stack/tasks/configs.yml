@@ -42,3 +42,82 @@
     - blackbox_alerts.yml
     - dora_alerts.yml
   notify: Restart Prometheus
+
+# Install certbot and nginx plugin
+- name: Install certbot and nginx plugin
+  become: true
+  apt:
+    name: 
+      - certbot
+      - python3-certbot-nginx
+    state: present
+    update_cache: true
+
+# Copy Nginx configuration for monitoring stack
+- name: Copy Nginx configuration for monitoring stack
+  become: true
+  copy:
+    src: nginx-monitoring.conf
+    dest: /etc/nginx/sites-available/monitoring
+  notify: restart nginx
+
+# Enable monitoring site
+- name: Enable monitoring site
+  become: true
+  file:
+    src: /etc/nginx/sites-available/monitoring
+    dest: /etc/nginx/sites-enabled/monitoring
+    state: link
+  notify: restart nginx
+
+# Remove default Nginx site
+- name: Remove default Nginx site
+  become: true
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: restart nginx
+
+# Copy Nginx configuration for Node.js app
+- name: Copy Nginx configuration for Node.js app
+  become: true
+  copy:
+    src: nginx-app.conf
+    dest: /etc/nginx/sites-available/app
+  notify: restart nginx
+
+# Enable Node.js app site
+- name: Enable Node.js app site
+  become: true
+  file:
+    src: /etc/nginx/sites-available/app
+    dest: /etc/nginx/sites-enabled/app
+    state: link
+  notify: restart nginx
+
+# Update SSL certificates command to include main domain
+- name: Obtain SSL certificates
+  become: true
+  command: >
+    certbot --nginx 
+    -d devopshng.online
+    -d prometheus.devopshng.online 
+    -d grafana.devopshng.online 
+    -d alerts.devopshng.online 
+    -d dora.devopshng.online 
+    --non-interactive 
+    --agree-tos 
+    --email {{ admin_email }}
+    --redirect
+  args:
+    creates: /etc/letsencrypt/live/devopshng.online
+
+# Set up automatic renewal
+- name: Add certbot renewal cron job
+  become: true
+  cron:
+    name: "Certbot renewal"
+    job: "certbot renew --quiet --post-hook 'systemctl reload nginx'"
+    minute: "0"
+    hour: "12"
+    weekday: "1"

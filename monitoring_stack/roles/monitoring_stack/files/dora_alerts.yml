@@ -1,0 +1,11 @@
+groups:
+- name: dora-metrics
+  rules:
+  - alert: HighChangeFailureRate
+    expr: (sum(increase(github_deployment_failed_total[7d])) / sum(increase(github_deployment_total[7d]))) * 100 > 15
+    for: 1h
+    labels:
+      severity: warning
+    annotations:
+      summary: "High change failure rate"
+      description: "Change failure rate is > 15% over the last 7 days"

@@ -1,0 +1,6 @@
+---
+- name: Deploy Monitoring Stack
+  hosts: monitoring_servers
+  become: true
+  roles:
+    - monitoring_stack

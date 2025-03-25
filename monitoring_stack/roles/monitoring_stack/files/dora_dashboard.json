@@ -1,0 +1,16 @@
+{
+    "dashboard": {
+      "title": "DORA Metrics",
+      "panels": [
+        {
+          "title": "Deployment Frequency",
+          "type": "graph",
+          "datasource": "Prometheus",
+          "targets": [{
+            "expr": "rate(github_deployment_total[1h])",
+            "legendFormat": "Deployments"
+          }]
+        }
+      ]
+    }
+  }

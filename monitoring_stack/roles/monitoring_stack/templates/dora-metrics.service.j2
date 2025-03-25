@@ -1,0 +1,14 @@
+[Unit]
+Description=DORA Metrics Exporter
+After=network.target
+
+[Service]
+User=dora
+Group=dora
+EnvironmentFile=/etc/default/dora-metrics
+WorkingDirectory=/opt/dora-exporter
+ExecStart=/opt/dora-exporter/venv/bin/python3 /opt/dora-exporter/main.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

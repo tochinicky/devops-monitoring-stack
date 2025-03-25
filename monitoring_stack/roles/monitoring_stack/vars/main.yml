@@ -1,0 +1,14 @@
+# Default variables
+component_users:
+  - prometheus
+  - alertmanager
+  - node_exporter
+  - blackbox
+  - dora
+  - grafana
+
+base_directories:
+  - /etc/prometheus
+  - /var/lib/prometheus
+  - /etc/alertmanager
+

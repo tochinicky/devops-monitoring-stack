@@ -1,0 +1,28 @@
+---
+- name: Deploy service files
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: 0644
+  loop:
+    - prometheus.service
+    - alertmanager.service
+    - node-exporter.service
+    - blackbox-exporter.service
+    - dora-metrics.service
+  notify: Reload systemd
+
+- name: Enable and start services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: yes
+  loop:
+    - prometheus
+    - alertmanager
+    - node-exporter
+    - blackbox-exporter
+    - dora-metrics
+    - grafana-server

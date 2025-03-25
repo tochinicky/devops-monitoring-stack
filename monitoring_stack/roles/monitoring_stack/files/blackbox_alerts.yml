@@ -1,0 +1,11 @@
+groups:
+- name: blackbox-exporter
+  rules:
+  - alert: EndpointDown
+    expr: probe_success == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Endpoint down (instance {{ $labels.instance }})"
+      description: "Endpoint {{ $labels.instance }} is down"

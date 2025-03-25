@@ -1,0 +1,209 @@
+- name: Create system users
+  ansible.builtin.user:
+    name: "{{ item }}"
+    system: yes
+    shell: /bin/false
+    create_home: no
+  loop:
+    - prometheus
+    - alertmanager
+    - node_exporter
+    - blackbox
+    - dora
+    - grafana
+
+- name: Verify users exist
+  ansible.builtin.command: "id {{ item }}"
+  loop: "{{ user_list }}"
+  register: user_check
+  failed_when: user_check.rc != 0
+  vars:
+    user_list:
+      - prometheus
+      - alertmanager
+      - blackbox
+      - dora
+      - grafana
+
+- name: Create directory structure
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode | default('0755') }}"
+  loop: "{{ directory_structure }}"
+  vars:
+    directory_structure:
+      - { path: /etc/prometheus, owner: prometheus, group: prometheus }
+      - { path: /etc/prometheus/rules, owner: prometheus, group: prometheus }
+      - { path: /etc/alertmanager, owner: alertmanager, group: alertmanager }
+      - { path: /etc/blackbox_exporter, owner: blackbox, group: blackbox }
+      - { path: /var/lib/prometheus, owner: prometheus, group: prometheus }
+      - { path: /var/lib/grafana, owner: grafana, group: grafana }
+      - { path: /var/lib/alertmanager, owner: alertmanager, group: alertmanager }
+      - { path: /opt/dora-exporter, owner: dora, group: dora }
+
+
+- name: Install Prometheus components
+  block:
+    - ansible.builtin.get_url:
+        url: "https://github.com/prometheus/prometheus/releases/download/v{{ component_versions.prometheus }}/prometheus-{{ component_versions.prometheus }}.linux-amd64.tar.gz"
+        dest: /tmp/prometheus.tar.gz
+        checksum: "sha256:{{ prometheus_checksum }}"
+    - ansible.builtin.unarchive:
+        src: /tmp/prometheus.tar.gz
+        dest: /tmp
+        remote_src: yes
+    - ansible.builtin.copy:
+        remote_src: yes
+        src: "/tmp/prometheus-{{ component_versions.prometheus }}.linux-amd64/{{ item }}"
+        dest: /usr/local/bin/{{ item }}
+        mode: 0755
+      loop:
+        - prometheus
+        - promtool
+
+- name: Install Alertmanager
+  block:
+    - ansible.builtin.get_url:
+        url: "https://github.com/prometheus/alertmanager/releases/download/v{{ component_versions.alertmanager }}/alertmanager-{{ component_versions.alertmanager }}.linux-amd64.tar.gz"
+        dest: /tmp/alertmanager.tar.gz
+        checksum: "sha256:{{ alertmanager_checksum }}"
+    - ansible.builtin.unarchive:
+        src: /tmp/alertmanager.tar.gz
+        dest: /tmp
+        remote_src: yes
+    - ansible.builtin.copy:
+        remote_src: yes
+        src: "/tmp/alertmanager-{{ component_versions.alertmanager }}.linux-amd64/alertmanager"
+        dest: /usr/local/bin/alertmanager
+        mode: 0755
+
+- name: Install Node Exporter
+  block:
+    - ansible.builtin.get_url:
+        url: "https://github.com/prometheus/node_exporter/releases/download/v{{ component_versions.node_exporter }}/node_exporter-{{ component_versions.node_exporter }}.linux-amd64.tar.gz"
+        dest: /tmp/node_exporter.tar.gz
+        checksum: "sha256:{{ node_exporter_checksum }}"
+    - ansible.builtin.unarchive:
+        src: /tmp/node_exporter.tar.gz
+        dest: /tmp
+        remote_src: yes
+    - ansible.builtin.copy:
+        remote_src: yes
+        src: "/tmp/node_exporter-{{ component_versions.node_exporter }}.linux-amd64/node_exporter"
+        dest: /usr/local/bin/node_exporter
+        mode: 0755
+
+- name: Install Blackbox Exporter
+  block:
+    - ansible.builtin.get_url:
+        url: "https://github.com/prometheus/blackbox_exporter/releases/download/v{{ component_versions.blackbox_exporter }}/blackbox_exporter-{{ component_versions.blackbox_exporter }}.linux-amd64.tar.gz"
+        dest: /tmp/blackbox_exporter.tar.gz
+        checksum: "sha256:{{ blackbox_exporter_checksum }}"
+    - ansible.builtin.unarchive:
+        src: /tmp/blackbox_exporter.tar.gz
+        dest: /tmp
+        remote_src: yes
+    - ansible.builtin.copy:
+        remote_src: yes
+        src: "/tmp/blackbox_exporter-{{ component_versions.blackbox_exporter }}.linux-amd64/blackbox_exporter"
+        dest: /usr/local/bin/blackbox_exporter
+        mode: 0755
+
+- name: Deploy DORA metrics exporter
+  block:
+    - name: Clone DORA repo
+      ansible.builtin.git:
+        repo: "{{ dora_repo }}"
+        dest: /opt/dora-exporter
+        version: main
+        force: yes
+      
+
+    - name: Set directory permissions
+      ansible.builtin.file:
+        path: /opt/dora-exporter
+        owner: dora
+        group: dora
+        recurse: yes
+        mode: 0755
+
+    - name: Configure Git safe directory
+      become: true
+      ansible.builtin.command:
+        cmd: "git config --global --add safe.directory /opt/dora-exporter"
+
+
+    - name: Configure DORA environment
+      ansible.builtin.template:
+        src: dora_env.j2
+        dest: /etc/default/dora-metrics
+        owner: dora
+        group: dora
+        mode: 0640
+
+    - name: Install Python dependencies
+      become: true
+      command: |
+        sudo -u dora /opt/dora-exporter/venv/bin/pip install -r /opt/dora-exporter/requirements.txt
+      args:
+        creates: /opt/dora-exporter/venv/lib/python3.11/site-packages/requests  # Example package
+
+# - name: Create virtual environment
+#   ansible.builtin.command:
+#     cmd: "python3 -m venv --system-site-packages /opt/dora-exporter/venv"
+#     creates: /opt/dora-exporter/venv
+#   become_user: dora
+- name: Create dora user home directory
+  ansible.builtin.file:
+    path: /home/dora
+    state: directory
+    owner: dora
+    group: dora
+    mode: 0750
+
+- name: Create virtual environment
+  ansible.builtin.command:
+    cmd: "python3 -m venv /opt/dora-exporter/venv"
+    creates: /opt/dora-exporter/venv
+  become_user: dora
+  vars:
+    ansible_remote_tmp: /home/dora/.ansible-tmp
+    ansible_become_flags: "--tmpdir /home/dora/.ansible-tmp"
+
+- name: Set venv permissions
+  ansible.builtin.file:
+    path: /opt/dora-exporter/venv
+    owner: dora
+    group: dora
+    mode: 0750
+    recurse: yes
+    
+- name: Install Python requirements
+  ansible.builtin.pip:
+    requirements: /opt/dora-exporter/requirements.txt
+    virtualenv: /opt/dora-exporter/venv
+    state: present
+  become_user: dora
+
+- name: Install Grafana
+  block:
+    - name: Add Grafana APT key
+      ansible.builtin.apt_key:
+        url: https://packages.grafana.com/gpg.key
+        state: present
+
+    - name: Add Grafana repository
+      ansible.builtin.apt_repository:
+        repo: "deb https://packages.grafana.com/oss/deb stable main"
+        state: present
+        update_cache: yes
+
+    - name: Install Grafana package
+      ansible.builtin.apt:
+        name: grafana
+        state: present
+        update_cache: yes
+        cache_valid_time: 3600

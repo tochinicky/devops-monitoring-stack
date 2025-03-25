@@ -1,0 +1,44 @@
+---
+
+- name: Deploy Prometheus configuration
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: /etc/prometheus/prometheus.yml
+    owner: prometheus
+    group: prometheus
+  notify: Restart Prometheus
+
+- name: Deploy Alertmanager configuration
+  ansible.builtin.copy:
+    src: files/alertmanager.yml
+    dest: /etc/alertmanager/alertmanager.yml
+    owner: alertmanager
+    group: alertmanager
+    mode: 0640
+  notify: Restart Alertmanager
+
+- name: Update Slack webhook URL
+  ansible.builtin.replace:
+    path: /etc/alertmanager/alertmanager.yml
+    regexp: '\{\{ slack_webhook_url \}\}'
+    replace: "{{ slack_webhook_url }}"
+
+- name: Deploy Blackbox configuration
+  ansible.builtin.template:
+    src: blackbox.yml.j2
+    dest: /etc/blackbox_exporter/blackbox.yml
+    owner: blackbox
+    group: blackbox
+  notify: Restart Blackbox Exporter
+
+- name: Deploy alert rules
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/etc/prometheus/rules/{{ item }}"
+    owner: prometheus
+    group: prometheus
+  loop:
+    - node_exporter_alerts.yml
+    - blackbox_alerts.yml
+    - dora_alerts.yml
+  notify: Restart Prometheus

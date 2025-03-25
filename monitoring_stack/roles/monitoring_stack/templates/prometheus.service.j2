@@ -1,0 +1,20 @@
+[Unit]
+Description=Prometheus
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=prometheus
+Group=prometheus
+ExecStart=/usr/local/bin/prometheus \
+  --config.file=/etc/prometheus/prometheus.yml \
+  --storage.tsdb.path=/var/lib/prometheus \
+  --web.console.libraries=/usr/share/prometheus/console_libraries \
+  --web.console.templates=/usr/share/prometheus/consoles \
+  --web.enable-lifecycle 
+  
+
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

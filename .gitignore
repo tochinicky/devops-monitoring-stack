@@ -17,6 +17,7 @@ terraform.lock.hcl
 .vault_pass
 *.vault
 monitoring_stack/group_vars/all.yml
+monitoring_stack/inventory.ini
 
 # Node.js
 node_modules/
@@ -38,3 +39,4 @@ yarn-error.log
 # OS
 .DS_Store
 Thumbs.db 
+monitoring_stack/inventory.ini

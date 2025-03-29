@@ -1,5 +1,4 @@
 ---
-
 - name: Deploy Prometheus configuration
   ansible.builtin.template:
     src: prometheus.yml.j2
@@ -47,7 +46,7 @@
 - name: Install certbot and nginx plugin
   become: true
   apt:
-    name: 
+    name:
       - certbot
       - python3-certbot-nginx
     state: present
@@ -96,8 +95,15 @@
   notify: restart nginx
 
 # Update SSL certificates command to include main domain
-- name: Obtain SSL certificates
-  become: true
+- name: Check for SSL configuration files
+  stat:
+    path: "{{ item }}"
+  register: ssl_files
+  loop:
+    - /etc/letsencrypt/options-ssl-nginx.conf
+    - /etc/letsencrypt/ssl-dhparams.pem
+
+- name: Run Certbot if SSL files do not exist
   command: >
     certbot --nginx 
     -d devopshng.online
@@ -105,12 +111,12 @@
     -d grafana.devopshng.online 
     -d alerts.devopshng.online 
     -d dora.devopshng.online 
+    -d loki.devopshng.online 
     --non-interactive 
     --agree-tos 
     --email {{ admin_email }}
     --redirect
-  args:
-    creates: /etc/letsencrypt/live/devopshng.online
+  when: not ssl_files.results[0].stat.exists or not ssl_files.results[1].stat.exists
 
 # Set up automatic renewal
 - name: Add certbot renewal cron job
@@ -121,3 +127,218 @@
     minute: "0"
     hour: "12"
     weekday: "1"
+
+# # Add Treasure Data repository
+# - name: Add Treasure Data repository
+#   become: true
+#   shell: |
+#     curl -fsSL https://packages.treasuredata.com/GPG-KEY-td-agent | apt-key add -
+#     echo "deb [arch=amd64] https://packages.treasuredata.com/4/ubuntu/focal/ focal contrib" > /etc/apt/sources.list.d/treasuredata.list
+#     apt-get update
+#   args:
+#     creates: /etc/apt/sources.list.d/treasuredata.list
+
+# # Install td-agent (Fluentd package)
+# - name: Install Fluentd (td-agent)
+#   shell: |
+#     curl -fsSL https://toolbelt.treasuredata.com/sh/install-ubuntu-focal-fluent-package5.sh | sh
+#   register: fluentd_install
+#   changed_when: fluentd_install.rc == 0
+
+- name: Ensure Fluentd GPG key is added
+  ansible.builtin.shell:
+    cmd: |
+      curl -fsSL https://packages.treasuredata.com/GPG-KEY-td-agent | gpg --dearmor -o /usr/share/keyrings/treasuredata.gpg
+
+- name: Add Fluentd repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/treasuredata.gpg] https://packages.treasuredata.com/5/ubuntu/jammy jammy contrib"
+    state: present
+    filename: treasuredata
+
+- name: Install td-agent
+  ansible.builtin.apt:
+    name: td-agent
+    state: present
+    update_cache: yes
+
+# Verify the td-agent binary exists
+- name: Check td-agent binary exists
+  stat:
+    path: /opt/td-agent/bin/td-agent
+  register: td_agent_binary
+
+- name: Debug td-agent binary
+  debug:
+    msg: "td-agent binary exists: {{ td_agent_binary.stat.exists }}"
+
+# Install required Fluentd plugins
+- name: Install Fluentd plugins
+  command: "/opt/td-agent/bin/fluent-gem install {{ item }}"
+  loop:
+    - fluent-plugin-grafana-loki
+    - fluent-plugin-record-transformer
+    - fluent-plugin-rewrite-tag-filter
+  when: td_agent_binary.stat.exists
+
+# Deploy Fluentd configuration file
+- name: Copy Fluentd configuration
+  template:
+    src: td-agent.conf.j2
+    dest: /etc/td-agent/td-agent.conf
+    owner: td-agent
+    group: td-agent
+    mode: "0640"
+  notify: Restart td-agent
+
+# Deploy Fluentd systemd service file
+- name: Deploy Fluentd systemd service file
+  template:
+    src: td-agent.service.j2
+    dest: /etc/systemd/system/td-agent.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+# Enable and start Fluentd service
+- name: Enable and start Fluentd service
+  systemd:
+    name: td-agent
+    state: started
+    enabled: yes
+
+# Create Loki user
+- name: Create loki user
+  user:
+    name: loki
+    system: yes
+    shell: /bin/false
+
+# Set Loki directory permissions
+- name: Set Loki directory permissions
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: loki
+    group: loki
+    mode: 0750
+  loop:
+    - /etc/loki
+    - /etc/loki/index
+    - /etc/loki/chunks
+
+# Ensure Loki config file permissions
+- name: Set Loki config file permissions
+  file:
+    path: /etc/loki/loki.yml
+    state: touch
+    owner: loki
+    group: loki
+    mode: 0640
+
+# Verify Loki directories
+- name: Check Loki directories
+  stat:
+    path: "{{ item }}"
+  register: loki_dirs
+  loop:
+    - /etc/loki
+    - /etc/loki/index
+    - /etc/loki/chunks
+
+- name: Display Loki directory status
+  debug:
+    var: loki_dirs.results
+
+# Download Loki
+- name: Download Loki
+  get_url:
+    url: "https://github.com/grafana/loki/releases/download/v{{ loki_version }}/loki-linux-amd64.zip"
+    dest: /tmp/loki.zip
+    checksum: "sha256:{{ loki_checksum }}"
+
+# Unpack Loki
+- name: Unpack Loki
+  unarchive:
+    src: /tmp/loki.zip
+    dest: /usr/local/bin
+    remote_src: yes
+    mode: 0755
+
+# Set Loki binary ownership
+- name: Set Loki binary ownership
+  file:
+    path: /usr/local/bin/loki-linux-amd64
+    owner: loki
+    group: loki
+    mode: 0755
+    state: touch
+
+# Verify Loki binary
+- name: Verify Loki binary
+  stat:
+    path: /usr/local/bin/loki-linux-amd64
+  register: loki_binary
+
+- name: Debug Loki binary
+  debug:
+    msg: "Loki binary exists: {{ loki_binary.stat.exists }}"
+
+# Deploy Loki config
+- name: Deploy Loki config
+  template:
+    src: loki.yml.j2
+    dest: /etc/loki/loki.yml
+    owner: loki
+    group: loki
+    mode: 0640
+  notify: Restart Loki
+
+# Create Loki service
+- name: Create Loki service
+  template:
+    src: loki.service.j2
+    dest: /etc/systemd/system/loki.service
+    mode: 0644
+  notify: Reload systemd
+
+# Start Loki service
+- name: Start Loki service
+  systemd:
+    name: loki
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+# Check Loki service status
+- name: Check Loki service status
+  command: systemctl status loki
+  register: loki_status
+  changed_when: false
+
+- name: Display Loki service status
+  debug:
+    var: loki_status.stdout_lines
+
+# Check Loki logs
+- name: Check Loki logs
+  command: journalctl -u loki -n 50
+  register: loki_logs
+  changed_when: false
+
+- name: Display Loki logs
+  debug:
+    var: loki_logs.stdout_lines
+
+# Test Loki API
+- name: Test Loki API
+  uri:
+    url: http://localhost:3100/ready
+    method: GET
+  register: loki_api_test
+  ignore_errors: true
+
+- name: Display Loki API test result
+  debug:
+    var: loki_api_test

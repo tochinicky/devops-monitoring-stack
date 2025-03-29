@@ -1,0 +1,14 @@
+[Unit]
+Description=td-agent: Fluentd based log collector
+After=network.target
+
+[Service]
+Type=simple
+User=td-agent
+Group=td-agent
+ExecStart=/opt/td-agent/bin/td-agent --log /var/log/td-agent/td-agent.log
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+
+[Install]
+WantedBy=multi-user.target 

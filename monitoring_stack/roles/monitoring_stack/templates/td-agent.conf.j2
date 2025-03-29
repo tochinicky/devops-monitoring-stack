@@ -1,0 +1,22 @@
+@include /etc/td-agent/conf.d/*.conf
+
+<source>
+  @type tail
+  path {{ fluentd_config.inputs | join(',') }}
+  pos_file /var/log/td-agent/pos/fluentd.pos
+  tag system.logs
+  <parse>
+    @type none
+  </parse>
+</source>
+
+<match system.logs>
+  @type loki
+  url {{ fluentd_config.loki_url }}
+  <label>
+    job fluentd
+  </label>
+  <label>
+    instance ${hostname}
+  </label>
+</match> 

@@ -23,3 +23,20 @@
   service:
     name: nginx
     state: restarted
+
+- name: Restart td-agent
+  become: true
+  systemd:
+    name: td-agent
+    state: restarted
+
+- name: Restart Loki
+  become: true
+  systemd:
+    name: loki
+    state: restarted
+
+- name: reload systemd
+  become: true
+  systemd:
+    daemon_reload: yes

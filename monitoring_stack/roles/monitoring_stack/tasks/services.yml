@@ -12,6 +12,8 @@
     - node-exporter.service
     - blackbox-exporter.service
     - dora-metrics.service
+    - td-agent.service
+    - loki.service
   notify: Reload systemd
 
 - name: Enable and start services
@@ -26,3 +28,5 @@
     - blackbox-exporter
     - dora-metrics
     - grafana-server
+    - td-agent
+    - loki

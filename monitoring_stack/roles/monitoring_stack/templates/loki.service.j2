@@ -1,0 +1,20 @@
+[Unit]
+Description=Loki Log Aggregation Service
+After=network.target
+
+[Service]
+Type=simple
+User=loki
+Group=loki
+WorkingDirectory=/etc/loki
+Environment=GOMAXPROCS=1
+Environment=LOG_LEVEL=debug
+ExecStartPre=/bin/sleep 5
+ExecStart=/usr/local/bin/loki-linux-amd64 -config.file=/etc/loki/loki.yml
+StandardOutput=journal
+StandardError=journal
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target 

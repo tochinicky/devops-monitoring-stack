@@ -6,9 +6,10 @@ component_users:
   - blackbox
   - dora
   - grafana
+  - loki
+  - td-agent
 
 base_directories:
   - /etc/prometheus
   - /var/lib/prometheus
   - /etc/alertmanager
-

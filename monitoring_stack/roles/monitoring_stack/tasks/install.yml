@@ -1,16 +1,27 @@
+- name: Install required packages
+  ansible.builtin.apt:
+    name:
+      - unzip
+      - bzip2
+      - xz-utils
+      - zstd
+    state: present
+    update_cache: yes
+
 - name: Create system users
   ansible.builtin.user:
-    name: "{{ item }}"
+    name: "{{ item.name }}"
     system: yes
     shell: /bin/false
-    create_home: no
   loop:
-    - prometheus
-    - alertmanager
-    - node_exporter
-    - blackbox
-    - dora
-    - grafana
+    - { name: prometheus }
+    - { name: alertmanager }
+    - { name: blackbox }
+    - { name: dora }
+    - { name: td-agent }
+    - { name: node_exporter }
+    - { name: grafana }
+    - { name: loki }
 
 - name: Verify users exist
   ansible.builtin.command: "id {{ item }}"
@@ -24,7 +35,9 @@
       - blackbox
       - dora
       - grafana
-
+      - node_exporter
+      - td-agent
+      - loki
 - name: Create directory structure
   ansible.builtin.file:
     path: "{{ item.path }}"
@@ -41,9 +54,16 @@
       - { path: /etc/blackbox_exporter, owner: blackbox, group: blackbox }
       - { path: /var/lib/prometheus, owner: prometheus, group: prometheus }
       - { path: /var/lib/grafana, owner: grafana, group: grafana }
-      - { path: /var/lib/alertmanager, owner: alertmanager, group: alertmanager }
+      - {
+          path: /var/lib/alertmanager,
+          owner: alertmanager,
+          group: alertmanager,
+        }
       - { path: /opt/dora-exporter, owner: dora, group: dora }
-
+      - { path: /etc/td-agent, owner: td-agent, group: td-agent }
+      - { path: /etc/td-agent/conf.d, owner: td-agent, group: td-agent }
+      - { path: /var/log/td-agent, owner: td-agent, group: td-agent }
+      - { path: /etc/loki, owner: loki, group: loki }
 
 - name: Install Prometheus components
   block:
@@ -201,3 +221,8 @@
         state: present
         update_cache: yes
         cache_valid_time: 3600
+# - name: Install td-agent
+#   ansible.builtin.apt:
+#     name: td-agent
+#     state: present
+#     update_cache: yes

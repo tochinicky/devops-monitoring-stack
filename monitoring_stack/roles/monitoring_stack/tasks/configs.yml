@@ -1,5 +1,4 @@
 ---
-
 - name: Deploy Prometheus configuration
   ansible.builtin.template:
     src: prometheus.yml.j2
@@ -47,59 +46,24 @@
 - name: Install certbot and nginx plugin
   become: true
   apt:
-    name: 
+    name:
       - certbot
       - python3-certbot-nginx
     state: present
     update_cache: true
 
-# Copy Nginx configuration for monitoring stack
-- name: Copy Nginx configuration for monitoring stack
+# Stop nginx temporarily for standalone mode
+- name: Stop nginx
   become: true
-  copy:
-    src: nginx-monitoring.conf
-    dest: /etc/nginx/sites-available/monitoring
-  notify: restart nginx
+  service:
+    name: nginx
+    state: stopped
 
-# Enable monitoring site
-- name: Enable monitoring site
-  become: true
-  file:
-    src: /etc/nginx/sites-available/monitoring
-    dest: /etc/nginx/sites-enabled/monitoring
-    state: link
-  notify: restart nginx
-
-# Remove default Nginx site
-- name: Remove default Nginx site
-  become: true
-  file:
-    path: /etc/nginx/sites-enabled/default
-    state: absent
-  notify: restart nginx
-
-# Copy Nginx configuration for Node.js app
-- name: Copy Nginx configuration for Node.js app
-  become: true
-  copy:
-    src: nginx-app.conf
-    dest: /etc/nginx/sites-available/app
-  notify: restart nginx
-
-# Enable Node.js app site
-- name: Enable Node.js app site
-  become: true
-  file:
-    src: /etc/nginx/sites-available/app
-    dest: /etc/nginx/sites-enabled/app
-    state: link
-  notify: restart nginx
-
-# Update SSL certificates command to include main domain
+# Obtain SSL certificates using standalone mode
 - name: Obtain SSL certificates
   become: true
   command: >
-    certbot --nginx 
+    certbot certonly --standalone
     -d devopshng.online
     -d prometheus.devopshng.online 
     -d grafana.devopshng.online 
@@ -108,9 +72,66 @@
     --non-interactive 
     --agree-tos 
     --email {{ admin_email }}
-    --redirect
   args:
     creates: /etc/letsencrypt/live/devopshng.online
+
+# Generate SSL DH parameters
+- name: Generate SSL DH parameters
+  become: true
+  command: openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048
+  args:
+    creates: /etc/letsencrypt/ssl-dhparams.pem
+
+# Copy Nginx configuration for monitoring stack
+- name: Copy Nginx configuration for monitoring stack
+  become: true
+  copy:
+    src: nginx-monitoring.conf
+    dest: /etc/nginx/sites-available/monitoring
+
+# Enable monitoring site
+- name: Enable monitoring site
+  become: true
+  file:
+    src: /etc/nginx/sites-available/monitoring
+    dest: /etc/nginx/sites-enabled/monitoring
+    state: link
+
+# Remove default Nginx site
+- name: Remove default Nginx site
+  become: true
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+
+# Copy Nginx configuration for Node.js app
+- name: Copy Nginx configuration for Node.js app
+  become: true
+  copy:
+    src: nginx-app.conf
+    dest: /etc/nginx/sites-available/app
+
+# Enable Node.js app site
+- name: Enable Node.js app site
+  become: true
+  file:
+    src: /etc/nginx/sites-available/app
+    dest: /etc/nginx/sites-enabled/app
+    state: link
+
+# Test Nginx configuration
+- name: Test Nginx configuration
+  become: true
+  command: nginx -t
+  register: nginx_test
+
+# Start nginx if configuration test passes
+- name: Start nginx
+  become: true
+  service:
+    name: nginx
+    state: started
+  when: nginx_test.rc == 0
 
 # Set up automatic renewal
 - name: Add certbot renewal cron job

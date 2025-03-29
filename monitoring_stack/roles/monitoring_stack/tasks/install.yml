@@ -41,9 +41,12 @@
       - { path: /etc/blackbox_exporter, owner: blackbox, group: blackbox }
       - { path: /var/lib/prometheus, owner: prometheus, group: prometheus }
       - { path: /var/lib/grafana, owner: grafana, group: grafana }
-      - { path: /var/lib/alertmanager, owner: alertmanager, group: alertmanager }
+      - {
+          path: /var/lib/alertmanager,
+          owner: alertmanager,
+          group: alertmanager,
+        }
       - { path: /opt/dora-exporter, owner: dora, group: dora }
-
 
 - name: Install Prometheus components
   block:
@@ -114,43 +117,59 @@
 
 - name: Deploy DORA metrics exporter
   block:
-    - name: Remove existing DORA directory if exists
-      ansible.builtin.file:
-        path: /opt/dora-exporter
-        state: absent
+    - name: Force remove DORA directory if exists
+      become: true
+      command: rm -rf /opt/dora-exporter/*
+      ignore_errors: true
 
     - name: Clone DORA repo
-      ansible.builtin.git:
-        repo: "{{ dora_repo }}"
+      become: true
+      git:
+        repo: https://github.com/Tochinicky/dora-metrics.git
         dest: /opt/dora-exporter
         version: main
         force: yes
-        accept_hostkey: yes
+      become_user: dora
+      environment:
+        HOME: /home/dora
+
+    - name: Create DORA directory with correct permissions
+      become: true
+      file:
+        path: /opt/dora-exporter
+        state: directory
+        owner: dora
+        group: dora
+        mode: "0755"
 
     - name: Set directory permissions
-      ansible.builtin.file:
+      become: true
+      file:
         path: /opt/dora-exporter
         owner: dora
         group: dora
         recurse: yes
-        mode: 0755
+        mode: "0755"
 
     - name: Create dora user home directory
-      ansible.builtin.file:
+      become: true
+      file:
         path: /home/dora
         state: directory
         owner: dora
         group: dora
-        mode: 0750
+        mode: "0750"
 
     - name: Install python3.12-venv package
-      ansible.builtin.apt:
+      become: true
+      apt:
         name: python3.12-venv
         state: present
         update_cache: yes
 
     - name: Create virtual environment
-      ansible.builtin.command:
+      become: true
+      command:
         cmd: "python3 -m venv /opt/dora-exporter/venv"
         creates: /opt/dora-exporter/venv
       become_user: dora
@@ -158,15 +177,17 @@
         HOME: /home/dora
 
     - name: Set venv permissions
-      ansible.builtin.file:
+      become: true
+      file:
         path: /opt/dora-exporter/venv
         owner: dora
         group: dora
-        mode: 0750
+        mode: "0750"
         recurse: yes
 
     - name: Install Python requirements
-      ansible.builtin.pip:
+      become: true
+      pip:
         requirements: /opt/dora-exporter/requirements.txt
         virtualenv: /opt/dora-exporter/venv
         state: present
@@ -175,12 +196,13 @@
         HOME: /home/dora
 
     - name: Configure DORA environment
-      ansible.builtin.template:
+      become: true
+      template:
         src: dora_env.j2
         dest: /etc/default/dora-metrics
         owner: dora
         group: dora
-        mode: 0640
+        mode: "0640"
 
 - name: Install Grafana
   block:

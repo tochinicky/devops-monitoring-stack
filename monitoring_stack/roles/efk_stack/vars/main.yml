@@ -1,0 +1,95 @@
+---
+# EFK Stack component versions
+elasticsearch_version: "7.17.10"
+kibana_version: "7.17.10"
+fluentd_version: "4.3.0" # td-agent version
+
+# Service ports
+elasticsearch_http_port: 9200
+elasticsearch_transport_port: 9300
+kibana_port: 5601
+fluentd_forward_port: 24224
+
+# Directory paths
+elasticsearch_home: /usr/share/elasticsearch
+elasticsearch_conf_dir: /etc/elasticsearch
+elasticsearch_data_dir: /var/lib/elasticsearch
+elasticsearch_log_dir: /var/log/elasticsearch
+
+kibana_home: /usr/share/kibana
+kibana_conf_dir: /etc/kibana
+kibana_log_dir: /var/log/kibana
+kibana_data_dir: /var/lib/kibana
+
+fluentd_conf_dir: /etc/td-agent
+fluentd_log_dir: /var/log/td-agent
+
+# System users and groups
+elasticsearch_user: elasticsearch
+elasticsearch_group: elasticsearch
+kibana_user: kibana
+kibana_group: kibana
+fluentd_user: td-agent
+fluentd_group: td-agent
+
+# Elasticsearch configuration
+elasticsearch_cluster_name: "monitoring-logs"
+elasticsearch_node_name: "node-1"
+elasticsearch_network_host: "0.0.0.0"
+elasticsearch_discovery_type: "single-node"
+elasticsearch_heap_size: "1g"
+elasticsearch_indices_memory_index_buffer_size: "30%"
+elasticsearch_indices_query_bool_max_clause_count: 1024
+elasticsearch_indices_fielddata_cache_size: "30%"
+elasticsearch_thread_pool_write_queue_size: 1000
+
+# Kibana configuration
+kibana_server_name: "kibana"
+kibana_server_host: "0.0.0.0"
+kibana_elasticsearch_hosts: ["http://localhost:9200"]
+kibana_elasticsearch_username: "kibana"
+kibana_elasticsearch_password: "kibana"
+kibana_server_basePath: ""
+kibana_server_rewriteBasePath: false
+
+# Fluentd configuration
+fluentd_system_log_types:
+  - syslog
+  - kernel
+  - auth
+  - daemon
+fluentd_buffer_type: "file"
+fluentd_buffer_path: "/var/log/td-agent/buffer"
+fluentd_buffer_queue_limit: 256
+fluentd_buffer_chunk_limit: "16m"
+fluentd_flush_interval: "5s"
+fluentd_retry_max_times: 5
+fluentd_retry_wait: "5s"
+
+# Nginx configuration for Kibana
+kibana_nginx_server_name: "_"
+kibana_nginx_port: 80
+kibana_nginx_ssl_port: 443
+kibana_nginx_access_log: "/var/log/nginx/kibana-access.log"
+kibana_nginx_error_log: "/var/log/nginx/kibana-error.log"
+kibana_nginx_ssl_enabled: false
+kibana_nginx_ssl_certificate: "/etc/ssl/certs/ssl-cert-snakeoil.pem"
+kibana_nginx_ssl_certificate_key: "/etc/ssl/private/ssl-cert-snakeoil.key"
+kibana_nginx_basic_auth_enabled: false
+kibana_nginx_basic_auth_file: "/etc/nginx/conf.d/kibana.htpasswd"
+
+# Log retention settings
+elasticsearch_log_retention_days: 7
+kibana_log_retention_days: 7
+fluentd_log_retention_days: 7
+
+# JVM settings for Elasticsearch
+elasticsearch_jvm_options:
+  - "-Xms{{ elasticsearch_heap_size }}"
+  - "-Xmx{{ elasticsearch_heap_size }}"
+  - "-XX:+UseG1GC"
+  - "-XX:G1ReservePercent=25"
+  - "-XX:InitiatingHeapOccupancyPercent=30"
+
+# Default index pattern settings for Kibana
+kibana_default_index: "logstash-*"

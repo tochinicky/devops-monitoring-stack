@@ -1,0 +1,79 @@
+---
+# Add Elasticsearch repository
+- name: Add Elasticsearch GPG key
+  ansible.builtin.apt_key:
+    url: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    state: present
+
+- name: Add Elasticsearch repository
+  ansible.builtin.apt_repository:
+    repo: "deb https://artifacts.elastic.co/packages/7.x/apt stable main"
+    state: present
+    update_cache: yes
+    filename: elastic-7.x
+
+# Install Elasticsearch
+- name: Install Elasticsearch
+  ansible.builtin.apt:
+    name: elasticsearch
+    state: present
+    update_cache: yes
+
+# Configure Elasticsearch settings
+- name: Configure Elasticsearch
+  ansible.builtin.template:
+    src: elasticsearch.yml.j2
+    dest: /etc/elasticsearch/elasticsearch.yml
+    owner: root
+    group: elasticsearch
+    mode: '0660'
+  notify: restart elasticsearch
+
+- name: Configure JVM options for Elasticsearch
+  ansible.builtin.template:
+    src: jvm.options.j2
+    dest: /etc/elasticsearch/jvm.options.d/heap.options
+    owner: root
+    group: elasticsearch
+    mode: '0660'
+  notify: restart elasticsearch
+
+# Set up proper permissions and directories
+- name: Create Elasticsearch data directory
+  ansible.builtin.file:
+    path: /var/lib/elasticsearch
+    state: directory
+    owner: elasticsearch
+    group: elasticsearch
+    mode: '0750'
+
+- name: Create Elasticsearch logs directory
+  ansible.builtin.file:
+    path: /var/log/elasticsearch
+    state: directory
+    owner: elasticsearch
+    group: elasticsearch
+    mode: '0750'
+
+# Create systemd service file
+- name: Ensure Elasticsearch systemd service file exists
+  ansible.builtin.copy:
+    src: /usr/lib/systemd/system/elasticsearch.service
+    dest: /etc/systemd/system/elasticsearch.service
+    remote_src: yes
+    owner: root
+    group: root
+    mode: '0644'
+  register: es_systemd_file
+
+- name: Reload systemd daemon if service file changed
+  ansible.builtin.systemd:
+    daemon_reload: yes
+  when: es_systemd_file.changed
+
+- name: Enable and start Elasticsearch service
+  ansible.builtin.systemd:
+    name: elasticsearch
+    enabled: yes
+    state: started
+

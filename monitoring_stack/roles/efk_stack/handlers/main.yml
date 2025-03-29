@@ -1,0 +1,40 @@
+---
+# Handlers for the EFK stack components
+
+- name: restart elasticsearch
+  service:
+    name: elasticsearch
+    state: restarted
+    enabled: yes
+  become: true
+
+- name: restart td-agent
+  service:
+    name: td-agent
+    state: restarted
+    enabled: yes
+  become: true
+
+- name: reload td-agent
+  service:
+    name: td-agent
+    state: reloaded
+  become: true
+
+- name: restart kibana
+  service:
+    name: kibana
+    state: restarted
+    enabled: yes
+  become: true
+
+- name: reload nginx
+  service:
+    name: nginx
+    state: reloaded
+  become: true
+
+- name: daemon reload
+  systemd:
+    daemon_reload: yes
+  become: true

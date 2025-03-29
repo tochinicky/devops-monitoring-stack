@@ -1,0 +1,74 @@
+---
+# Add Kibana repository
+- name: Add Elasticsearch GPG key
+  ansible.builtin.apt_key:
+    url: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    state: present
+
+- name: Add Kibana repository
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64] https://artifacts.elastic.co/packages/7.x/apt stable main"
+    state: present
+    update_cache: yes
+
+# Install Kibana
+- name: Install Kibana
+  ansible.builtin.apt:
+    name: kibana
+    state: present
+
+# Create required directories
+- name: Create Kibana log directory
+  ansible.builtin.file:
+    path: /var/log/kibana
+    state: directory
+    owner: kibana
+    group: kibana
+    mode: '0755'
+
+# Configure Kibana
+- name: Configure Kibana
+  ansible.builtin.template:
+    src: kibana.yml.j2
+    dest: /etc/kibana/kibana.yml
+    owner: kibana
+    group: kibana
+    mode: '0644'
+  notify: restart kibana
+
+# Setup systemd service
+- name: Ensure Kibana systemd service file exists
+  ansible.builtin.template:
+    src: kibana.service.j2
+    dest: /etc/systemd/system/kibana.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: systemd reload
+
+- name: Ensure Kibana service is enabled and started
+  ansible.builtin.systemd:
+    name: kibana
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+# Set proper permissions
+- name: Set appropriate permissions for Kibana configuration files
+  ansible.builtin.file:
+    path: /etc/kibana
+    state: directory
+    owner: kibana
+    group: kibana
+    mode: '0750'
+    recurse: yes
+
+- name: Set appropriate permissions for Kibana data directory
+  ansible.builtin.file:
+    path: /var/lib/kibana
+    state: directory
+    owner: kibana
+    group: kibana
+    mode: '0750'
+    recurse: yes
+

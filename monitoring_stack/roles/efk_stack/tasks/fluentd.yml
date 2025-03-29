@@ -1,0 +1,96 @@
+---
+# Add td-agent repository based on OS distribution
+# - name: Add td-agent GPG key
+#   ansible.builtin.apt_key:
+#     url: https://packages.treasuredata.com/GPG-KEY-td-agent
+#     state: present
+#   when: ansible_os_family == "Debian"
+
+- name: Add td-agent repository for Debian/Ubuntu
+  ansible.builtin.apt_repository:
+    repo: "deb https://packages.treasuredata.com/4/{{ ansible_distribution|lower }}/{{ ansible_distribution_release|lower }}/ {{ ansible_distribution_release|lower }} contrib"
+    state: present
+    filename: treasure-data
+  when: ansible_os_family == "Debian"
+
+# - name: Add td-agent repository for RHEL/CentOS
+#   ansible.builtin.yum_repository:
+#     name: treasuredata
+#     description: TreasureData Repository
+#     baseurl: https://packages.treasuredata.com/4/redhat/$releasever/$basearch
+#     gpgcheck: 1
+#     gpgkey: https://packages.treasuredata.com/GPG-KEY-td-agent
+#   when: ansible_os_family == "RedHat"
+
+# Install td-agent (Fluentd)
+- name: Install td-agent
+  ansible.builtin.package:
+    name: td-agent
+    state: present
+
+# Install Fluentd plugins
+- name: Install Fluentd plugins for Elasticsearch
+  ansible.builtin.command:
+    cmd: /usr/sbin/td-agent-gem install fluent-plugin-elasticsearch
+  register: gem_result
+  changed_when: "'Successfully installed' in gem_result.stdout"
+
+# Configure td-agent
+- name: Create td-agent configuration directory
+  ansible.builtin.file:
+    path: /etc/td-agent/conf.d
+    state: directory
+    mode: "0755"
+    owner: td-agent
+    group: td-agent
+
+- name: Configure td-agent main config
+  ansible.builtin.template:
+    src: td-agent.conf.j2
+    dest: /etc/td-agent/td-agent.conf
+    owner: td-agent
+    group: td-agent
+    mode: "0644"
+  notify: restart td-agent
+
+- name: Configure system logs collection
+  ansible.builtin.template:
+    src: td-agent-system.conf.j2
+    dest: /etc/td-agent/conf.d/system.conf
+    owner: td-agent
+    group: td-agent
+    mode: "0644"
+  notify: restart td-agent
+
+- name: Configure application logs collection
+  ansible.builtin.template:
+    src: td-agent-app.conf.j2
+    dest: /etc/td-agent/conf.d/application.conf
+    owner: td-agent
+    group: td-agent
+    mode: "0644"
+  notify: restart td-agent
+
+# Add permissions for td-agent to read log files
+- name: Add td-agent user to adm group for log access
+  ansible.builtin.user:
+    name: td-agent
+    groups: adm
+    append: yes
+
+# Configure systemd service
+- name: Ensure td-agent systemd service is properly configured
+  ansible.builtin.systemd:
+    name: td-agent
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+# Configure log rotation
+- name: Configure log rotation for td-agent
+  ansible.builtin.template:
+    src: td-agent.logrotate.j2
+    dest: /etc/logrotate.d/td-agent
+    owner: root
+    group: root
+    mode: "0644"

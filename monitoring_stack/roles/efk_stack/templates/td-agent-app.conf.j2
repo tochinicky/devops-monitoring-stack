@@ -1,0 +1,187 @@
+##############################
+# Application logs collection #
+##############################
+
+#######################
+# Nginx logs (Web server)
+#######################
+
+# Nginx access logs
+<source>
+  @type tail
+  tag app.nginx.access
+  path /var/log/nginx/access.log
+  pos_file /var/log/td-agent/pos/nginx_access.pos
+  <parse>
+    @type nginx
+    keep_time_key true
+  </parse>
+</source>
+
+# Nginx error logs
+<source>
+  @type tail
+  tag app.nginx.error
+  path /var/log/nginx/error.log
+  pos_file /var/log/td-agent/pos/nginx_error.pos
+  <parse>
+    @type regexp
+    expression /^(?<time>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) \[(?<log_level>\w+)\] (?<pid>\d+)#(?<tid>\d+): (?<message>.*)$/
+    time_key time
+    time_format %Y/%m/%d %H:%M:%S
+  </parse>
+</source>
+
+# Add special buffering for high-volume nginx logs
+<match app.nginx.**>
+  @type copy
+  <store>
+    @type relabel
+    @label @FORWARD_TO_ES
+  </store>
+  <buffer>
+    @type file
+    path /var/log/td-agent/buffer/nginx
+    flush_interval {{ fluentd_nginx_flush_interval | default('3s') }}
+    chunk_limit_size {{ fluentd_nginx_chunk_limit_size | default('2M') }}
+    total_limit_size 512MB
+  </buffer>
+</match>
+
+#######################
+# Monitoring stack logs
+#######################
+
+# Prometheus logs
+<source>
+  @type tail
+  tag app.prometheus
+  path /var/log/prometheus/*.log
+  pos_file /var/log/td-agent/pos/prometheus.pos
+  <parse>
+    @type regexp
+    expression /^(?<time>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z) (?<level>\w+) (?<message>.*)$/
+    time_key time
+    time_format %Y-%m-%dT%H:%M:%S.%NZ
+  </parse>
+</source>
+
+# Alertmanager logs
+<source>
+  @type tail
+  tag app.alertmanager
+  path /var/log/alertmanager/*.log
+  pos_file /var/log/td-agent/pos/alertmanager.pos
+  <parse>
+    @type regexp
+    expression /^(?<time>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z) (?<level>\w+) (?<message>.*)$/
+    time_key time
+    time_format %Y-%m-%dT%H:%M:%S.%NZ
+  </parse>
+</source>
+
+# Node Exporter logs
+<source>
+  @type tail
+  tag app.node_exporter
+  path /var/log/node_exporter/*.log
+  pos_file /var/log/td-agent/pos/node_exporter.pos
+  <parse>
+    @type regexp
+    expression /^(?<time>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z) (?<level>\w+) (?<message>.*)$/
+    time_key time
+    time_format %Y-%m-%dT%H:%M:%S.%NZ
+  </parse>
+</source>
+
+# Blackbox Exporter logs
+<source>
+  @type tail
+  tag app.blackbox_exporter
+  path /var/log/blackbox_exporter/*.log
+  pos_file /var/log/td-agent/pos/blackbox_exporter.pos
+  <parse>
+    @type regexp
+    expression /^(?<time>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z) (?<level>\w+) (?<message>.*)$/
+    time_key time
+    time_format %Y-%m-%dT%H:%M:%S.%NZ
+  </parse>
+</source>
+
+#######################
+# EFK stack logs (Self-monitoring)
+#######################
+
+# Elasticsearch logs
+<source>
+  @type tail
+  tag app.elasticsearch
+  path /var/log/elasticsearch/*.log
+  pos_file /var/log/td-agent/pos/elasticsearch.pos
+  <parse>
+    @type multiline
+    format_firstline /^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2},\d{3}\]/
+    format1 /^\[(?<time>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2},\d{3})\]\[(?<severity>\w+)\]\[(?<source>[^\]]*)\] (?<message>.*)/
+    time_key time
+    time_format %Y-%m-%dT%H:%M:%S,%L
+  </parse>
+</source>
+
+# Kibana logs
+<source>
+  @type tail
+  tag app.kibana
+  path /var/log/kibana/*.log
+  pos_file /var/log/td-agent/pos/kibana.pos
+  <parse>
+    @type regexp
+    expression /^(?<time>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})[\.\d+Z]* (?<level>\w+) (?<message>.*)$/
+    time_key time
+    time_format %Y-%m-%dT%H:%M:%S
+  </parse>
+</source>
+
+# TD-Agent's own logs (fluentd)
+<source>
+  @type tail
+  tag app.td_agent
+  path /var/log/td-agent/td-agent.log
+  pos_file /var/log/td-agent/pos/td-agent.pos
+  <parse>
+    @type regexp
+    expression /^(?<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [-+]\d{4}) \[(?<level>\w+)\] (?<message>.*)$/
+    time_key time
+    time_format %Y-%m-%d %H:%M:%S %z
+  </parse>
+</source>
+
+# Format and enrich application logs before forwarding
+<filter app.**>
+  @type record_transformer
+  <record>
+    hostname "{{ ansible_hostname }}"
+    log_source "application"
+    log_type ${tag_parts[1]}
+    service ${tag_parts[1]}
+    {% if tag_parts[2] %}sub_service ${tag_parts[2]}{% endif %}
+    environment "{{ environment | default('production') }}"
+  </record>
+</filter>
+
+# Forward all application logs to Elasticsearch
+<match app.**>
+  @type relabel
+  @label @FORWARD_TO_ES
+</match>
+
+<label @FORWARD_TO_ES>
+  <match **>
+    @type copy
+    <store>
+      # This will be matched by the main elasticsearch output in td-agent.conf
+      @type relabel
+      @label @DEFAULT
+    </store>
+  </match>
+</label>
+

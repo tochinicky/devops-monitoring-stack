@@ -1,0 +1,76 @@
+##########################
+# System logs collection #
+##########################
+
+# Tail syslog files
+<source>
+  @type tail
+  tag system.syslog
+  path /var/log/syslog
+  pos_file /var/log/td-agent/pos/syslog.pos
+  <parse>
+    @type syslog
+  </parse>
+</source>
+
+# Tail auth logs
+<source>
+  @type tail
+  tag system.auth
+  path /var/log/auth.log
+  pos_file /var/log/td-agent/pos/auth.pos
+  <parse>
+    @type syslog
+  </parse>
+</source>
+
+# Tail kernel logs
+<source>
+  @type tail
+  tag system.kern
+  path /var/log/kern.log
+  pos_file /var/log/td-agent/pos/kern.pos
+  <parse>
+    @type syslog
+  </parse>
+</source>
+
+# Collect dmesg output
+<source>
+  @type tail
+  tag system.dmesg
+  path /var/log/dmesg
+  pos_file /var/log/td-agent/pos/dmesg.pos
+  <parse>
+    @type none
+  </parse>
+</source>
+
+# Process systemd journal logs
+<source>
+  @type systemd
+  tag system.journal
+  path /var/log/journal
+  filters [{"_SYSTEMD_UNIT": "sshd.service"}, {"_SYSTEMD_UNIT": "sudo.service"}]
+  <storage>
+    @type local
+    persistent true
+    path /var/log/td-agent/storage/systemd.pos
+  </storage>
+  <entry>
+    field_map {"MESSAGE": "message", "_PID": "pid", "_CMDLINE": "command", "_COMM": "command_name", "_SYSTEMD_UNIT": "systemd_unit"}
+    field_map_strict false
+  </entry>
+</source>
+
+# Format and enrich system logs before forwarding
+<filter system.**>
+  @type record_transformer
+  <record>
+    hostname "{{ ansible_hostname }}"
+    log_source "system"
+    log_type ${tag_parts[1]}
+    environment "{{ environment | default('production') }}"
+  </record>
+</filter>
+

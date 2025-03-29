@@ -1,0 +1,53 @@
+# Kibana configuration
+# Managed by Ansible
+
+# Server settings
+server.port: {{ kibana_port | default(5601) }}
+server.host: "{{ kibana_host | default('0.0.0.0') }}"
+server.name: "{{ kibana_server_name | default('kibana') }}"
+server.publicBaseUrl: "{{ kibana_public_base_url | default('') }}"
+
+# Elasticsearch connection
+elasticsearch.hosts: ["http://{{ elasticsearch_host | default('localhost') }}:{{ elasticsearch_port | default(9200) }}"]
+elasticsearch.username: "{{ elasticsearch_username | default('kibana_system') }}"
+elasticsearch.password: "{{ elasticsearch_password | default('changeme') }}"
+elasticsearch.requestTimeout: {{ elasticsearch_request_timeout | default(30000) }}
+elasticsearch.shardTimeout: {{ elasticsearch_shard_timeout | default(30000) }}
+
+{% if kibana_ssl_enabled | default(false) %}
+# SSL Configuration
+server.ssl.enabled: true
+server.ssl.certificate: "{{ kibana_ssl_cert_path }}"
+server.ssl.key: "{{ kibana_ssl_key_path }}"
+{% endif %}
+
+# Logging configuration
+logging.root.level: {{ kibana_log_level | default('info') }}
+logging.appenders.file:
+  type: file
+  fileName: "{{ kibana_log_dir | default('/var/log/kibana') }}/kibana.log"
+  layout:
+    type: json
+logging.appenders.console:
+  type: console
+  layout:
+    type: json
+
+# Path configurations
+path.data: "{{ kibana_data_dir | default('/var/lib/kibana') }}"
+
+# Monitoring
+monitoring.ui.container.elasticsearch.enabled: {{ kibana_monitoring_enabled | default(true) }}
+
+# Kibana specific settings
+kibana.index: ".kibana"
+kibana.defaultAppId: "{{ kibana_default_app_id | default('home') }}"
+
+# Security settings
+xpack.security.enabled: {{ xpack_security_enabled | default(true) }}
+xpack.reporting.enabled: {{ xpack_reporting_enabled | default(true) }}
+xpack.encryptedSavedObjects.encryptionKey: "{{ xpack_encryption_key | default('somesupersecretkey') }}"
+
+# Feature controls
+map.includeElasticMapsService: {{ include_elastic_maps | default(false) }}
+

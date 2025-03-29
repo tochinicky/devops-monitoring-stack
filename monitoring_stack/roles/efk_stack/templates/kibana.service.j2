@@ -1,0 +1,42 @@
+[Unit]
+Description=Kibana
+Documentation=https://www.elastic.co/kibana
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User={{ kibana_user | default('kibana') }}
+Group={{ kibana_group | default('kibana') }}
+Environment="NODE_OPTIONS=--max-old-space-size={{ kibana_max_old_space_size | default(1800) }}"
+Environment="KIBANA_HOME=/usr/share/kibana"
+Environment="KIBANA_KEYSTORE_DIR={{ kibana_data_dir | default('/var/lib/kibana') }}"
+
+ExecStart=/usr/share/kibana/bin/kibana --config {{ kibana_config_path | default('/etc/kibana/kibana.yml') }}
+
+StandardOutput=journal
+StandardError=journal
+
+# Specifies the maximum file descriptor number that can be opened by this process
+LimitNOFILE=65535
+
+# Specifies the maximum number of processes
+LimitNPROC=4096
+
+# Disable timeout logic and wait until process is stopped
+TimeoutStopSec=0
+
+# SIGTERM signal is used to stop Kibana
+KillSignal=SIGTERM
+KillMode=process
+
+# Restart Kibana if it crashes
+Restart=on-failure
+RestartSec=5
+
+# Maintain a nice process priority
+Nice=19
+
+[Install]
+WantedBy=multi-user.target
+

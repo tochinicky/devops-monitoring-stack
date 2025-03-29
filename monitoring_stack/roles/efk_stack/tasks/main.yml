@@ -1,0 +1,62 @@
+---
+# Main tasks file for EFK stack role
+
+- name: Check if Java is installed
+  command: which java
+  register: java_installed
+  failed_when: false
+  changed_when: false
+  tags: [elasticsearch, kibana]
+
+- name: Install Java dependencies
+  apt:
+    name:
+      - openjdk-11-jdk
+      - apt-transport-https
+      - gnupg2
+    state: present
+    update_cache: yes
+  become: true
+  when: java_installed.rc != 0
+  tags: [elasticsearch, kibana]
+
+- name: Install build dependencies
+  apt:
+    name:
+      - build-essential
+      - ruby-dev
+      - curl
+      - gnupg2
+    state: present
+  become: true
+  tags: [fluentd]
+
+# Import separate task files for each component
+- name: Setup Elasticsearch
+  import_tasks: elasticsearch.yml
+  tags: [elasticsearch]
+
+- name: Setup Fluentd
+  import_tasks: fluentd.yml
+  tags: [fluentd]
+
+- name: Setup Kibana
+  import_tasks: kibana.yml
+  tags: [kibana]
+
+- name: Configure Nginx for Kibana
+  import_tasks: nginx.yml
+  tags: [kibana, nginx]
+
+- name: Ensure all services are running
+  systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: yes
+  become: true
+  loop:
+    - elasticsearch
+    - td-agent
+    - kibana
+  tags: [services]
+

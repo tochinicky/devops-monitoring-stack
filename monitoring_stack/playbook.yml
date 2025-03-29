@@ -1,6 +1,28 @@
 ---
-- name: Deploy Monitoring Stack
+- name: Deploy Monitoring and Logging Stack
   hosts: monitoring_servers
   become: true
+  vars:
+    # EFK Stack Configuration
+    elasticsearch_heap_size: "1g"
+    elasticsearch_cluster_name: "monitoring-cluster"
+    elasticsearch_node_name: "node-1"
+    elasticsearch_data_path: "/var/lib/elasticsearch"
+    elasticsearch_log_path: "/var/log/elasticsearch"
+
+    # Kibana Configuration
+    kibana_server_name: "logs.devopshng.online"
+    kibana_elasticsearch_hosts: ["http://localhost:9200"]
+
+    # Fluentd Configuration
+    fluentd_sources:
+      - type: "syslog"
+        port: 5140
+      - type: "tail"
+        path: "/var/log/nginx/access.log"
+        tag: "nginx.access"
+    fluentd_flush_interval: "5s"
+
   roles:
     - monitoring_stack
+    - efk_stack

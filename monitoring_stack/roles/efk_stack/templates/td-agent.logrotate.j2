@@ -1,0 +1,27 @@
+/var/log/td-agent/*.log {
+  daily
+  rotate 30
+  compress
+  delaycompress
+  notifempty
+  create 640 td-agent td-agent
+  sharedscripts
+  postrotate
+    /bin/systemctl reload td-agent >/dev/null 2>&1 || true
+  endscript
+}
+
+/var/log/td-agent/buffer/* {
+  daily
+  rotate 10
+  compress
+  missingok
+  notifempty
+  create 660 td-agent td-agent
+  delaycompress
+  sharedscripts
+  postrotate
+    /bin/systemctl reload td-agent >/dev/null 2>&1 || true
+  endscript
+}
+

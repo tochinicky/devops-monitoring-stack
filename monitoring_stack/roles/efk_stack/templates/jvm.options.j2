@@ -1,0 +1,66 @@
+## JVM configuration
+
+################################################################
+## IMPORTANT: JVM heap size
+################################################################
+#
+# You should always set the min and max JVM heap
+# size to the same value. For example:
+#
+# -Xms2g
+# -Xmx2g
+#
+# These settings are adjusted automatically based on available system memory
+-Xms{{ elasticsearch_heap_size | default('1g') }}
+-Xmx{{ elasticsearch_heap_size | default('1g') }}
+
+################################################################
+## Expert settings
+################################################################
+
+## GC configuration
+8-13:-XX:+UseConcMarkSweepGC
+8-13:-XX:CMSInitiatingOccupancyFraction=75
+8-13:-XX:+UseCMSInitiatingOccupancyOnly
+
+## G1GC Configuration
+# NOTE: G1 GC is only supported on JDK version 10 or later
+# to use G1GC, uncomment the next line and update the version number accordingly
+# 10-13:-XX:+UseG1GC
+
+## JVM temporary directory
+-Djava.io.tmpdir=${ES_TMPDIR}
+
+## heap dumps
+
+# generate a heap dump when an allocation from the Java heap fails
+# heap dumps are created in the working directory of the JVM
+-XX:+HeapDumpOnOutOfMemoryError
+
+# specify an alternative path for heap dumps
+# ensure the directory exists and has sufficient space
+-XX:HeapDumpPath={{ elasticsearch_log_dir | default('/var/log/elasticsearch') }}
+
+## JDK 8 GC logging
+8:-XX:+PrintGCDetails
+8:-XX:+PrintGCDateStamps
+8:-XX:+PrintTenuringDistribution
+8:-XX:+PrintGCApplicationStoppedTime
+8:-Xloggc:{{ elasticsearch_log_dir | default('/var/log/elasticsearch') }}/gc.log
+8:-XX:+UseGCLogFileRotation
+8:-XX:NumberOfGCLogFiles=32
+8:-XX:GCLogFileSize=64m
+
+# JDK 9+ GC logging
+9-:-Xlog:gc*,gc+age=trace,safepoint:file={{ elasticsearch_log_dir | default('/var/log/elasticsearch') }}/gc.log:utctime,pid,tags:filecount=32,filesize=64m
+
+## Reduce OpenSSL issues on CentOS
+-Djdk.tls.ephemeralDHKeySize=2048
+
+## Bugfixes specific to OpenJDK
+-XX:+DisableExplicitGC
+
+## Network timeout settings
+-Dsun.net.client.defaultConnectTimeout=60000
+-Dsun.net.client.defaultReadTimeout=60000
+

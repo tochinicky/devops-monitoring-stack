@@ -1,0 +1,129 @@
+######################
+# Main td-agent config #
+######################
+
+# Include system log configurations
+@include /etc/td-agent/td-agent-system.conf
+
+# Include application log configurations
+@include /etc/td-agent/td-agent-app.conf
+
+# Global parameters
+<system>
+  log_level {{ fluentd_log_level | default('info') }}
+  workers {{ fluentd_workers | default(2) }}
+  root_dir /var/log/td-agent
+  
+  # Enable detailed error tracing
+  suppress_repeated_stacktrace false
+  emit_error_log_interval 5
+</system>
+
+# Set up logging for td-agent itself
+<label @FLUENT_LOG>
+  <match **>
+    @type file
+    path /var/log/td-agent/td-agent.log
+    append true
+    <format>
+      @type json
+    </format>
+    <buffer>
+      @type file
+      path /var/log/td-agent/buffer/td-agent-log
+      flush_interval 5s
+    </buffer>
+  </match>
+</label>
+
+# Forward logs to Elasticsearch
+<match **>
+  @type elasticsearch
+  host {{ elasticsearch_host | default('localhost') }}
+  port {{ elasticsearch_port | default(9200) }}
+  logstash_format true
+  logstash_prefix {{ fluentd_logstash_prefix | default('logstash') }}
+  include_tag_key true
+  tag_key @log_name
+  flush_interval {{ fluentd_flush_interval | default('5s') }}
+  reconnect_on_error true
+  reload_on_failure true
+  request_timeout 15s
+  <buffer>
+    @type file
+    path /var/log/td-agent/buffer/elasticsearch
+    flush_thread_count {{ fluentd_flush_thread_count | default(2) }}
+    flush_interval {{ fluentd_buffer_flush_interval | default('5s') }}
+    chunk_limit_size {{ fluentd_chunk_limit_size | default('8M') }}
+    queue_limit_length {{ fluentd_queue_limit_length | default(32) }}
+    retry_max_interval {{ fluentd_retry_max_interval | default('30m') }}
+    retry_forever true
+    
+    # Improved buffer error handling
+    retry_type exponential_backoff
+    retry_exponential_backoff_base 2
+    retry_randomize true
+    
+    # Better overflow handling
+    overflow_action block
+    
+    # Detailed logging
+    flush_at_shutdown true
+  </buffer>
+  
+  # Log Elasticsearch errors separately
+  <secondary>
+    @type file
+    path /var/log/td-agent/elasticsearch_failures.log
+    append true
+    <format>
+      @type json
+    </format>
+  </secondary>
+</match>
+
+# Enhanced error monitoring 
+<label @ERROR>
+  <match **>
+    @type file
+    path /var/log/td-agent/error.log
+    append true
+    <format>
+      @type json
+      time_format %Y-%m-%dT%H:%M:%S%z
+    </format>
+    <buffer>
+      @type file
+      path /var/log/td-agent/buffer/error
+      flush_interval {{ fluentd_error_flush_interval | default('5s') }}
+      flush_mode interval
+      retry_forever true
+      retry_max_interval 30s
+    </buffer>
+  </match>
+</label>
+
+# Create a dedicated connection error monitor
+<filter elasticsearch.**>
+  @type record_transformer
+  enable_ruby true
+  <record>
+    error_class ${record["error"].class}
+    error_message ${record["error"].message}
+    error_detail ${record["error"].to_json}
+    agent_host {{ ansible_hostname }}
+    timestamp ${Time.now.to_i}
+  </record>
+</filter>
+
+# Monitor Elasticsearch plugin's health
+<match fluent.elasticsearch.output.buffer.overflow>
+  @type file
+  path /var/log/td-agent/elasticsearch_overflow.log
+  append true
+  <format>
+    @type json
+    time_format %Y-%m-%dT%H:%M:%S%z
+  </format>
+</match>
+
